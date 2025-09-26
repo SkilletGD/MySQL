@@ -82,7 +82,13 @@ app.delete("/inventory/:id", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// Ruta raíz (opcional, solo para mostrar mensaje al entrar a /)
+app.get("/", (req, res) => {
+  res.send("¡Servidor Node.js conectado a Aiven! Usa /inventory para interactuar con la base de datos.");
+});
 
 // Iniciar servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+
+
