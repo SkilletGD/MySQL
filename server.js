@@ -94,19 +94,12 @@ app.get("/rollos", async (req, res) => {
   }
 });
 
-// Crear un nuevo rollo
+// Crear un nuevo rollo y devolverlo completo
 app.post("/rollos", async (req, res) => {
   try {
-    const {
-      tipo_tela,
-      color,
-      codigo,
-      cantidad_total,
-      fecha_compra,
-      proveedor,
-      registrado_por
-    } = req.body;
+    const { tipo_tela, color, codigo, cantidad_total, fecha_compra, proveedor, registrado_por } = req.body;
 
+    // Insertar el rollo
     const [result] = await pool.query(
       `INSERT INTO rollos (tipo_tela, color, codigo, cantidad_total, cantidad_restante, fecha_compra, proveedor, registrado_por)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -120,7 +113,12 @@ app.post("/rollos", async (req, res) => {
       [result.insertId, registrado_por]
     );
 
-    res.status(201).json({ message: "Rollo agregado correctamente", id: result.insertId });
+    // Traer el rollo recién creado
+    const [[nuevoRollo]] = await pool.query("SELECT * FROM rollos WHERE id=?", [result.insertId]);
+
+    // Devolver el rollo completo
+    res.status(201).json(nuevoRollo);
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -163,7 +161,6 @@ app.post("/ventas", async (req, res) => {
   try {
     const { rollo_id, cantidad_vendida, vendedor, cliente } = req.body;
 
-    // Registrar venta
     await pool.query(
       `INSERT INTO ventas (rollo_id, cantidad_vendida, vendedor, cliente)
        VALUES (?, ?, ?, ?)`,
@@ -267,3 +264,4 @@ app.get("/", (req, res) => {
 ============================================================ */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Servidor corriendo en puerto ${PORT}`));
+
