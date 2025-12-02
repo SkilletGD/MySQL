@@ -5,7 +5,9 @@ require("dotenv").config();
 const app = express();
 app.use(express.json());
 
-// Pool de conexión MySQL
+// ===============================
+// 🔌 CONEXIÓN A MySQL
+// ===============================
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,
@@ -15,252 +17,190 @@ const pool = mysql.createPool({
   ssl: { rejectUnauthorized: false }
 });
 
-/* ============================================================
-   🔧 INICIALIZACIÓN DE TABLAS
-============================================================ */
+// ===============================
+// 🛠️ INICIALIZAR TABLAS
+// ===============================
 async function initDB() {
   try {
-    console.log("Inicializando base de datos...");
+    console.log("🛠️ Creando tablas...");
 
-    // Tabla rollos
+    // Tabla Libros
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS rollos (
+      CREATE TABLE IF NOT EXISTS libros (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        tipo_tela VARCHAR(100) NOT NULL,
-        color VARCHAR(50),
-        codigo VARCHAR(50) UNIQUE NOT NULL,
-        cantidad_total DECIMAL(10,2) NOT NULL,
-        cantidad_restante DECIMAL(10,2) NOT NULL,
-        fecha_compra DATE NOT NULL,
-        proveedor VARCHAR(100),
-        registrado_por VARCHAR(100),
-        estado ENUM('Disponible', 'Vendido', 'Agotado') DEFAULT 'Disponible'
+        titulo VARCHAR(200) NOT NULL,
+        autor VARCHAR(200),
+        categoria VARCHAR(100),
+        precio DECIMAL(10,2) NOT NULL,
+        stock INT NOT NULL,
+        codigo VARCHAR(100) UNIQUE,
+        imageUrl VARCHAR(300),
+        fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // Tabla ventas
+    // Tabla Cafés
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS cafes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nombre VARCHAR(200) NOT NULL,
+        tipo VARCHAR(100),
+        origen VARCHAR(100),
+        precio DECIMAL(10,2) NOT NULL,
+        stock INT NOT NULL,
+        codigo VARCHAR(100) UNIQUE,
+        imageUrl VARCHAR(300),
+        fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Tabla Ventas
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ventas (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        rollo_id INT NOT NULL,
-        cantidad_vendida DECIMAL(10,2) NOT NULL,
-        fecha_venta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        producto_id INT NOT NULL,
+        tipo_producto ENUM('libro','cafe') NOT NULL,
+        cantidad INT NOT NULL,
+        total DECIMAL(10,2) NOT NULL,
         vendedor VARCHAR(100),
         cliente VARCHAR(100),
-        FOREIGN KEY (rollo_id) REFERENCES rollos(id) ON DELETE CASCADE
+        fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // Tabla historial
+    // Tabla Historial
     await pool.query(`
       CREATE TABLE IF NOT EXISTS historial (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        rollo_id INT,
-        accion VARCHAR(100),
-        fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        producto_id INT,
+        tipo_producto ENUM('libro','cafe'),
+        accion VARCHAR(200),
         usuario VARCHAR(100),
-        FOREIGN KEY (rollo_id) REFERENCES rollos(id) ON DELETE CASCADE
+        fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // Tabla clientes
+    // Tabla Clientes
     await pool.query(`
       CREATE TABLE IF NOT EXISTS clientes (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        nombre VARCHAR(100) NOT NULL,
-        saldo_total DECIMAL(10,2) DEFAULT 0.00
+        nombre VARCHAR(200),
+        saldo_total DECIMAL(10,2) DEFAULT 0.0
       )
     `);
 
-    console.log("✅ Tablas creadas correctamente");
-  } catch (err) {
-    console.error("❌ Error inicializando DB:", err.message);
+    console.log("✅ Tablas listas");
+  } catch (e) {
+    console.error("❌ Error:", e.message);
   }
 }
 
 initDB();
 
-/* ============================================================
-   📦 RUTAS PARA ROLLOS
-============================================================ */
+// =====================================================================
+// 📚 CRUD LIBROS
+// =====================================================================
 
-// Obtener todos los rollos
-app.get("/rollos", async (req, res) => {
-  try {
-    const [rows] = await pool.query("SELECT * FROM rollos ORDER BY id DESC");
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+// Obtener libros
+app.get("/libros", async (req, res) => {
+  const [rows] = await pool.query("SELECT * FROM libros ORDER BY id DESC");
+  res.json(rows);
 });
 
-// Crear un nuevo rollo y devolverlo completo
-app.post("/rollos", async (req, res) => {
-  try {
-    const { tipo_tela, color, codigo, cantidad_total, fecha_compra, proveedor, registrado_por } = req.body;
+// Insertar libro
+app.post("/libros", async (req, res) => {
+  const { titulo, autor, categoria, precio, stock, codigo, imageUrl } = req.body;
 
-    // Insertar el rollo
-    const [result] = await pool.query(
-      `INSERT INTO rollos (tipo_tela, color, codigo, cantidad_total, cantidad_restante, fecha_compra, proveedor, registrado_por)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [tipo_tela, color, codigo, cantidad_total, cantidad_total, fecha_compra, proveedor, registrado_por]
-    );
+  const [result] = await pool.query(
+    `INSERT INTO libros (titulo, autor, categoria, precio, stock, codigo, imageUrl)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [titulo, autor, categoria, precio, stock, codigo, imageUrl]
+  );
 
-    // Registrar acción en historial
-    await pool.query(
-      `INSERT INTO historial (rollo_id, accion, usuario)
-       VALUES (?, 'Rollo registrado', ?)`,
-      [result.insertId, registrado_por]
-    );
-
-    // Traer el rollo recién creado
-    const [[nuevoRollo]] = await pool.query("SELECT * FROM rollos WHERE id=?", [result.insertId]);
-
-    // Devolver el rollo completo
-    res.status(201).json(nuevoRollo);
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  res.status(201).json({ id: result.insertId, message: "Libro agregado" });
 });
 
-// Actualizar información del rollo
-app.put("/rollos/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { tipo_tela, color, codigo, cantidad_total, cantidad_restante, proveedor, estado } = req.body;
+// =====================================================================
+// ☕ CRUD CAFÉS
+// =====================================================================
 
-    await pool.query(
-      `UPDATE rollos SET tipo_tela=?, color=?, codigo=?, cantidad_total=?, cantidad_restante=?, proveedor=?, estado=? WHERE id=?`,
-      [tipo_tela, color, codigo, cantidad_total, cantidad_restante, proveedor, estado, id]
-    );
-
-    res.json({ message: "Rollo actualizado correctamente" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+// Obtener cafés
+app.get("/cafes", async (req, res) => {
+  const [rows] = await pool.query("SELECT * FROM cafes ORDER BY id DESC");
+  res.json(rows);
 });
 
-// Eliminar rollo
-app.delete("/rollos/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    await pool.query("DELETE FROM rollos WHERE id=?", [id]);
-    res.json({ message: "Rollo eliminado" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+// Insertar café
+app.post("/cafes", async (req, res) => {
+  const { nombre, tipo, origen, precio, stock, codigo, imageUrl } = req.body;
+
+  const [result] = await pool.query(
+    `INSERT INTO cafes (nombre, tipo, origen, precio, stock, codigo, imageUrl)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [nombre, tipo, origen, precio, stock, codigo, imageUrl]
+  );
+
+  res.status(201).json({ id: result.insertId, message: "Café agregado" });
 });
 
-/* ============================================================
-   💸 RUTAS PARA VENTAS
-============================================================ */
-
-// Registrar una venta parcial o total
+// =====================================================================
+// 🛒 REGISTRO DE VENTAS
+// =====================================================================
 app.post("/ventas", async (req, res) => {
-  try {
-    const { rollo_id, cantidad_vendida, vendedor, cliente } = req.body;
+  const { producto_id, tipo_producto, cantidad, vendedor, cliente } = req.body;
 
-    await pool.query(
-      `INSERT INTO ventas (rollo_id, cantidad_vendida, vendedor, cliente)
-       VALUES (?, ?, ?, ?)`,
-      [rollo_id, cantidad_vendida, vendedor, cliente]
-    );
-
-    // Actualizar metros restantes
-    const [[rollo]] = await pool.query("SELECT cantidad_restante FROM rollos WHERE id=?", [rollo_id]);
-    const nuevaCantidad = rollo.cantidad_restante - cantidad_vendida;
-
-    let nuevoEstado = "Disponible";
-    if (nuevaCantidad <= 0) nuevoEstado = "Agotado";
-
-    await pool.query(
-      "UPDATE rollos SET cantidad_restante=?, estado=? WHERE id=?",
-      [Math.max(nuevaCantidad, 0), nuevoEstado, rollo_id]
-    );
-
-    // Registrar acción en historial
-    await pool.query(
-      `INSERT INTO historial (rollo_id, accion, usuario)
-       VALUES (?, 'Venta registrada', ?)`,
-      [rollo_id, vendedor]
-    );
-
-    res.json({ message: "Venta registrada correctamente" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  if (!["libro", "cafe"].includes(tipo_producto)) {
+    return res.status(400).json({ error: "tipo_producto inválido" });
   }
+
+  // Obtener precio
+  const tabla = tipo_producto === "libro" ? "libros" : "cafes";
+  const [[producto]] = await pool.query(`SELECT precio, stock FROM ${tabla} WHERE id=?`, [producto_id]);
+
+  if (!producto) return res.status(404).json({ error: "Producto no encontrado" });
+
+  if (producto.stock < cantidad) return res.status(400).json({ error: "Stock insuficiente" });
+
+  const total = producto.precio * cantidad;
+
+  // Insertar venta
+  await pool.query(
+    `INSERT INTO ventas (producto_id, tipo_producto, cantidad, total, vendedor, cliente)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [producto_id, tipo_producto, cantidad, total, vendedor, cliente]
+  );
+
+  // Actualizar stock
+  await pool.query(`UPDATE ${tabla} SET stock = stock - ? WHERE id=?`, [cantidad, producto_id]);
+
+  // Registrar historial
+  await pool.query(
+    `INSERT INTO historial (producto_id, tipo_producto, accion, usuario)
+     VALUES (?, ?, 'Venta realizada', ?)`,
+    [producto_id, tipo_producto, vendedor]
+  );
+
+  res.json({ message: "Venta registrada", total });
 });
 
-// Obtener todas las ventas
-app.get("/ventas", async (req, res) => {
-  try {
-    const [rows] = await pool.query(`
-      SELECT v.*, r.tipo_tela, r.color, r.codigo
-      FROM ventas v
-      JOIN rollos r ON v.rollo_id = r.id
-      ORDER BY v.fecha_venta DESC
-    `);
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+// =====================================================================
+// 📜 HISTORIAL
+// =====================================================================
+app.get("/historial/:tipo/:id", async (req, res) => {
+  const { tipo, id } = req.params;
+
+  const [rows] = await pool.query(
+    `SELECT * FROM historial WHERE tipo_producto=? AND producto_id=? ORDER BY fecha DESC`,
+    [tipo, id]
+  );
+
+  res.json(rows);
 });
 
-/* ============================================================
-   📜 HISTORIAL
-============================================================ */
-
-app.get("/historial/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const [rows] = await pool.query(
-      `SELECT * FROM historial WHERE rollo_id=? ORDER BY fecha DESC`,
-      [id]
-    );
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/* ============================================================
-   💰 CLIENTES
-============================================================ */
-
-// Obtener clientes
-app.get("/clientes", async (req, res) => {
-  try {
-    const [rows] = await pool.query("SELECT * FROM clientes");
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Crear cliente
-app.post("/clientes", async (req, res) => {
-  try {
-    const { nombre, saldo_total } = req.body;
-    const [result] = await pool.query(
-      "INSERT INTO clientes (nombre, saldo_total) VALUES (?, ?)",
-      [nombre, saldo_total]
-    );
-    res.status(201).json({ message: "Cliente agregado", id: result.insertId });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/* ============================================================
-   🌐 RUTA RAÍZ
-============================================================ */
-app.get("/", (req, res) => {
-  res.send("✅ Servidor Node.js conectado a MySQL | Endpoints: /rollos /ventas /historial /clientes");
-});
-
-/* ============================================================
-   🚀 INICIAR SERVIDOR
-============================================================ */
+// =====================================================================
+// 🚀 INICIAR SERVIDOR
+// =====================================================================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Servidor corriendo en puerto ${PORT}`));
+app.listen(PORT, () =>
+  console.log(`🚀 Servidor activo en puerto ${PORT}`)
+);
