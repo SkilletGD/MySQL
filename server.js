@@ -120,6 +120,46 @@ app.post("/libros", async (req, res) => {
   res.status(201).json({ id: result.insertId, message: "Libro agregado" });
 });
 
+// Actualizar libro
+app.put("/libros/:id", async (req, res) => {
+  const { id } = req.params;
+  const { titulo, autor, categoria, precio, stock, codigo, imageUrl } = req.body;
+
+  try {
+    const [result] = await pool.query(
+      `UPDATE libros 
+       SET titulo=?, autor=?, categoria=?, precio=?, stock=?, codigo=?, imageUrl=?
+       WHERE id=?`,
+      [titulo, autor, categoria, precio, stock, codigo, imageUrl, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Libro no encontrado" });
+    }
+
+    res.json({ message: "Libro actualizado correctamente" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Borrar libro por id
+app.delete("/libros/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [result] = await pool.query("DELETE FROM libros WHERE id = ?", [id]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Libro no encontrado" });
+    }
+
+    res.json({ message: "Libro eliminado correctamente" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // =====================================================================
 // ☕ CRUD CAFÉS
 // =====================================================================
@@ -142,6 +182,48 @@ app.post("/cafes", async (req, res) => {
 
   res.status(201).json({ id: result.insertId, message: "Café agregado" });
 });
+
+// Actualizar café
+app.put("/cafes/:id", async (req, res) => {
+  const { id } = req.params;
+  const { nombre, tipo, origen, precio, stock, codigo, imageUrl } = req.body;
+
+  try {
+    const [result] = await pool.query(
+      `UPDATE cafes 
+       SET nombre=?, tipo=?, origen=?, precio=?, stock=?, codigo=?, imageUrl=?
+       WHERE id=?`,
+      [nombre, tipo, origen, precio, stock, codigo, imageUrl, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Café no encontrado" });
+    }
+
+    res.json({ message: "Café actualizado correctamente" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Borrar café por id
+app.delete("/cafes/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const [result] = await pool.query("DELETE FROM cafes WHERE id = ?", [id]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Café no encontrado" });
+    }
+
+    res.json({ message: "Café eliminado correctamente" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 
 // =====================================================================
 // 🛒 REGISTRO DE VENTAS
@@ -197,6 +279,7 @@ app.get("/historial/:tipo/:id", async (req, res) => {
   res.json(rows);
 });
 
+
 // =====================================================================
 // 🚀 INICIAR SERVIDOR
 // =====================================================================
@@ -204,3 +287,6 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () =>
   console.log(`🚀 Servidor activo en puerto ${PORT}`)
 );
+
+
+
