@@ -142,6 +142,32 @@ app.put("/libros/:id", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+// Actualizar parcialmente un libro
+app.patch("/libros/:id", async (req, res) => {
+  const { id } = req.params;
+  const campos = req.body; // aquí llega un objeto con los campos que quieras actualizar
+
+  const camposSQL = Object.keys(campos)
+    .map(key => `${key} = ?`)
+    .join(", ");
+  const valores = Object.values(campos);
+
+  try {
+    const [result] = await pool.query(
+      `UPDATE libros SET ${camposSQL} WHERE id = ?`,
+      [...valores, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Libro no encontrado" });
+    }
+
+    res.json({ message: "Libro actualizado correctamente" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 // Borrar libro por id
 app.delete("/libros/:id", async (req, res) => {
@@ -194,6 +220,31 @@ app.put("/cafes/:id", async (req, res) => {
        SET nombre=?, tipo=?, origen=?, precio=?, stock=?, codigo=?, imageUrl=?
        WHERE id=?`,
       [nombre, tipo, origen, precio, stock, codigo, imageUrl, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Café no encontrado" });
+    }
+
+    res.json({ message: "Café actualizado correctamente" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+// Actualizar parcialmente un café
+app.patch("/cafes/:id", async (req, res) => {
+  const { id } = req.params;
+  const campos = req.body;
+
+  const camposSQL = Object.keys(campos)
+    .map(key => `${key} = ?`)
+    .join(", ");
+  const valores = Object.values(campos);
+
+  try {
+    const [result] = await pool.query(
+      `UPDATE cafes SET ${camposSQL} WHERE id = ?`,
+      [...valores, id]
     );
 
     if (result.affectedRows === 0) {
@@ -287,6 +338,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () =>
   console.log(`🚀 Servidor activo en puerto ${PORT}`)
 );
+
 
 
 
