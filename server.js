@@ -119,6 +119,17 @@ app.post("/libros", async (req, res) => {
 
   res.status(201).json({ id: result.insertId, message: "Libro agregado" });
 });
+// Obtener libro por ID
+app.get("/libros/:id", async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [rows] = await pool.query("SELECT * FROM libros WHERE id = ?", [id]);
+        if (rows.length === 0) return res.status(404).json({ message: "Libro no encontrado" });
+        res.json(rows[0]);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
 
 // Actualizar libro
 app.put("/libros/:id", async (req, res) => {
@@ -208,7 +219,17 @@ app.post("/cafes", async (req, res) => {
 
   res.status(201).json({ id: result.insertId, message: "Café agregado" });
 });
-
+// Obtener café por ID
+app.get("/cafes/:id", async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [rows] = await pool.query("SELECT * FROM cafes WHERE id = ?", [id]);
+        if (rows.length === 0) return res.status(404).json({ message: "Café no encontrado" });
+        res.json(rows[0]);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
 // Actualizar café
 app.put("/cafes/:id", async (req, res) => {
   const { id } = req.params;
@@ -338,6 +359,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () =>
   console.log(`🚀 Servidor activo en puerto ${PORT}`)
 );
+
 
 
 
